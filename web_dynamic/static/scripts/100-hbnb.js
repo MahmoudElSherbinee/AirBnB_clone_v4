@@ -1,111 +1,88 @@
-$(document).ready(function () {
-    let selected = [];
-    const HOST = 'localhost';
-    // Listen for changes on each input checkbox tag
-    $('input[type=checkbox]').click(function () {
-      let name = $(this).attr('data-name');
-      if ($(this).is(':checked')) {
-        selected.push(name);
-      } else {
-        selected = selected.filter(val => val !== name);
+$(document).ready(init);
+
+const HOST = "0.0.0.0";
+const amenityObj = {};
+const stateObj = {};
+const cityObj = {};
+let obj = {};
+
+function init() {
+  $(".amenities .popover input").change(function () {
+    obj = amenityObj;
+    checkedObjects.call(this, 1);
+  });
+  $(".state_input").change(function () {
+    obj = stateObj;
+    checkedObjects.call(this, 2);
+  });
+  $(".city_input").change(function () {
+    obj = cityObj;
+    checkedObjects.call(this, 3);
+  });
+  apiStatus();
+  searchPlaces();
+}
+
+function checkedObjects(nObject) {
+  if ($(this).is(":checked")) {
+    obj[$(this).attr("data-name")] = $(this).attr("data-id");
+  } else if ($(this).is(":not(:checked)")) {
+    delete obj[$(this).attr("data-name")];
+  }
+  const names = Object.keys(obj);
+  if (nObject === 1) {
+    $(".amenities h4").text(names.sort().join(", "));
+  } else if (nObject === 2) {
+    $(".locations h4").text(names.sort().join(", "));
+  }
+}
+
+function apiStatus() {
+  const API_URL = `http://${HOST}:5001/api/v1/status/`;
+  $.get(API_URL, (data, textStatus) => {
+    if (textStatus === "success" && data.status === "OK") {
+      $("#api_status").addClass("available");
+    } else {
+      $("#api_status").removeClass("available");
+    }
+  });
+}
+
+function searchPlaces() {
+  const PLACES_URL = `http://${HOST}:5001/api/v1/places_search/`;
+  $.ajax({
+    url: PLACES_URL,
+    type: "POST",
+    headers: { "Content-Type": "application/json" },
+    data: JSON.stringify({
+      amenities: Object.values(amenityObj),
+      states: Object.values(stateObj),
+      cities: Object.values(cityObj),
+    }),
+    success: function (response) {
+      $("SECTION.places").empty();
+      for (const r of response) {
+        const article = [
+          "<article>",
+          '<div class="title_box">',
+          `<h2>${r.name}</h2>`,
+          `<div class="price_by_night">$${r.price_by_night}</div>`,
+          "</div>",
+          '<div class="information">',
+          `<div class="max_guest">${r.max_guest} Guest(s)</div>`,
+          `<div class="number_rooms">${r.number_rooms} Bedroom(s)</div>`,
+          `<div class="number_bathrooms">${r.number_bathrooms} Bathroom(s)</div>`,
+          "</div>",
+          '<div class="description">',
+          `${r.description}`,
+          "</div>",
+          "</article>",
+        ];
+        $("SECTION.places").append(article.join(""));
       }
-  
-      if (selected.length === 0) {
-        $('.amenities h4').html('&nbsp;');
-      } else {
-        $('.amenities h4').text(selected.join(', '));
-      }
-    });
-  
-    // Check API status and update the #api_status div
-    function checkApiStatus() {
-      $.get('http://localhost:5001/api/v1/status/', function(data) {
-        if (data.status === 'OK') {
-          $('#api_status').addClass('available');
-        } else {
-          $('#api_status').removeClass('available');
-        }
-      }).fail(function() {
-        $('#api_status').removeClass('available');
-      });
-    }
-  
-    // Initial check for API status
-    checkApiStatus();
-
-
-    function search (filters = {}) {
-      $.ajax({
-        type: 'POST',
-        url: `http://${HOST}:5001/api/v1/places_search`,
-        data: JSON.stringify(filters),
-        dataType: 'json',
-        contentType: 'application/json',
-        success: function (data) {
-          $('SECTION.places').empty();
-          $('SECTION.places').append(data.map(place => {
-            return `<article>
-                      <div class="title_box">
-                        <h2>${place.name}</h2>
-                        <div class="price_by_night">${place.price_by_night}</div>
-                      </div>
-                      <div class="information">
-                        <div class="max_guest">${place.max_guest} Guests</div>
-                        <div class="number_rooms">${place.number_rooms} Bedrooms</div>
-                        <div class="number_bathrooms">${place.number_bathrooms} Bathrooms</div>
-                      </div>
-                      <div class="description">
-                        ${place.description}
-                      </div>
-                    </article>`
-          }));
-        }
-      });
-    };
-  
-     // Obtain selected states
-  const states = {};
-  $('.locations ul h2 input[type="checkbox"]').click(function () {
-    if ($(this).is(":checked")) {
-      states[$(this).attr('data-id')] = $(this).attr('data-name');
-    } else {
-      delete states[$(this).attr('data-id')];
-    }
-    updateLocations(states, cities);
+    },
+    error: function (error) {
+      console.log(error);
+    },
   });
-
-  // Obtain selected cities
-  const cities = {};
-  $('.locations ul ul li input[type="checkbox"]').click(function () {
-    if ($(this).is(":checked")) {
-      cities[$(this).attr('data-id')] = $(this).attr('data-name');
-    } else {
-      delete cities[$(this).attr('data-id')];
-    }
-    updateLocations(states, cities);
-  });
-
-  // Obtain selected amenities
-  const amenities = {};
-  $('.amenities input[type="checkbox"]').click(function () {
-    if ($(this).is(":checked")) {
-      amenities[$(this).attr('data-id')] = $(this).attr('data-name');
-    } else {
-      delete amenities[$(this).attr('data-id')];
-    }
-    $('.amenities h4').text(Object.values(amenities).join(', '));
-  });
-  
-    // Search event with selected filters
-    $('#search').click(function () {
-      const filters = {
-        'states': Object.keys(states),
-        'cities': Object.keys(cities),
-        'amenities': Object.keys(amenities)
-      };
-      search(filters);
-    });
-  
-    // Display all places when the website is launched
-    search();
-  });
+}
